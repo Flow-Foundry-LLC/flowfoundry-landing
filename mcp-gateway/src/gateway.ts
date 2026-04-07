@@ -111,7 +111,7 @@ setupApp.post("/setup/saml/callback", authLimiter, express.urlencoded({ extended
       runtimeConfig.gateway_url, "4h"
     );
 
-    res.setHeader("Set-Cookie", `gateway_session=${access_token}; HttpOnly; Secure; SameSite=Strict; Max-Age=14400; Path=/`);
+    res.setHeader("Set-Cookie", `gateway_session=${access_token}; HttpOnly; Secure; SameSite=Lax; Max-Age=14400; Path=/`);
     res.redirect("/setup");
   } catch (err) {
     console.error("[setup] SAML callback error:", err);
