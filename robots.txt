@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.flowfoundry.com/sitemap.xml
+Sitemap: https://www.flowfoundry.com/blog/sitemap.xml
