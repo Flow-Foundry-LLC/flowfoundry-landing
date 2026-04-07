@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireRole } from "../middleware/auth.js";
 import * as db from "../db.js";
 import { refreshZohoToken, getUserProjectIds } from "../auth/zoho-api.js";
+import { discoverOAuthEndpoints, initiateOAuthConnect, registerOAuthClient } from "./oauth-service.js";
 
 const api = Router();
 
@@ -29,16 +30,42 @@ api.delete("/clients/:projectId", requireRole("super_admin"), (req, res) => {
 // ── Services ────────────────────────────────────────────────────────────────
 
 api.get("/clients/:projectId/services", requireRole("super_admin", "admin"), (req, res) => {
-  res.json(db.listServicesForClient(req.params.projectId));
+  const services = db.listServicesForClient(req.params.projectId).map((s) => ({
+    ...s,
+    oauth_client_secret: s.oauth_client_secret ? "***" : "",
+    oauth_access_token: s.oauth_access_token ? "***" : "",
+    oauth_refresh_token: s.oauth_refresh_token ? "***" : "",
+  }));
+  res.json(services);
+});
+
+api.get("/services/next-port", requireRole("super_admin", "admin"), (_req, res) => {
+  const clients = db.listClients();
+  let maxPort = 3099;
+  for (const client of clients) {
+    const services = db.listServicesForClient(client.project_id);
+    for (const s of services) {
+      const match = s.url.match(/:(\d+)/);
+      if (match) {
+        const port = parseInt(match[1]);
+        if (port > maxPort) maxPort = port;
+      }
+    }
+  }
+  res.json({ port: maxPort + 1 });
 });
 
 api.post("/clients/:projectId/services", requireRole("super_admin", "admin"), (req, res) => {
-  const { name, url, api_key_env, auth_type } = req.body;
+  const { name, url, api_key_env, auth_type,
+    oauth_client_id, oauth_client_secret, oauth_authorize_url, oauth_token_url, oauth_scope } = req.body;
   if (!name || !url) {
     res.status(400).json({ error: "name and url are required" });
     return;
   }
-  const service = db.createService(req.params.projectId, name, url, api_key_env || "", auth_type || "api_key");
+  const service = db.createService(req.params.projectId, name, url, api_key_env || "", auth_type || "api_key", {
+    client_id: oauth_client_id, client_secret: oauth_client_secret,
+    authorize_url: oauth_authorize_url, token_url: oauth_token_url, scope: oauth_scope,
+  });
   res.json(service);
 });
 
@@ -55,6 +82,97 @@ api.put("/services/:id", requireRole("super_admin", "admin"), (req, res) => {
 api.delete("/services/:id", requireRole("super_admin"), (req, res) => {
   db.deleteService(parseInt(req.params.id));
   res.json({ ok: true });
+});
+
+// ── Service OAuth ──────────────────────────────────────────────────────────
+
+api.post("/oauth-discover", requireRole("super_admin", "admin"), async (req, res) => {
+  const { url } = req.body;
+  if (!url) { res.status(400).json({ error: "url is required" }); return; }
+  const result = await discoverOAuthEndpoints(url);
+  res.json(result);
+});
+
+let _gatewayUrl = "";
+export function setGatewayUrl(url: string) { _gatewayUrl = url; }
+
+api.get("/services/:id/oauth-connect", requireRole("super_admin", "admin"), async (req, res) => {
+  let service = db.getService(parseInt(req.params.id));
+  if (!service) { res.status(404).json({ error: "Service not found" }); return; }
+  if (service.auth_type !== "oauth") { res.status(400).json({ error: "Service is not OAuth type" }); return; }
+
+  let authorizeUrl = service.oauth_authorize_url;
+  let tokenUrl = service.oauth_token_url;
+  let clientId = service.oauth_client_id;
+  let usePkce = false;
+  let registrationEndpoint = "";
+
+  // Always try discovery to detect PKCE requirements
+  const discovered = await discoverOAuthEndpoints(service.url);
+  if (discovered.discovered) {
+    usePkce = (discovered.code_challenge_methods_supported || []).includes("S256");
+    registrationEndpoint = discovered.registration_endpoint || "";
+
+    if (!authorizeUrl) {
+      authorizeUrl = discovered.authorization_endpoint!;
+      tokenUrl = discovered.token_endpoint!;
+      db.updateService(service.id, {
+        oauth_authorize_url: authorizeUrl,
+        oauth_token_url: tokenUrl,
+        oauth_scope: discovered.scopes_supported?.join(" ") || service.oauth_scope,
+      });
+      console.log(`[oauth] Auto-discovered endpoints for ${service.name}: ${authorizeUrl}`);
+    }
+  } else if (!authorizeUrl) {
+    // No discovery and no saved endpoints — can't proceed
+    res.status(400).json({
+      error: "Could not auto-discover OAuth endpoints. Please configure them in Advanced settings.",
+      needs_config: true,
+    });
+    return;
+  }
+
+  // If discovery didn't detect PKCE but the authorize URL looks like Zoho, force PKCE
+  if (!usePkce && authorizeUrl.includes("zoho")) {
+    usePkce = true;
+  }
+
+  // Step 2: Dynamic client registration if no client_id
+  if (!clientId) {
+    if (registrationEndpoint) {
+      try {
+        const reg = await registerOAuthClient(registrationEndpoint, _gatewayUrl, service.name);
+        clientId = reg.client_id;
+        db.updateService(service.id, {
+          oauth_client_id: clientId,
+          oauth_client_secret: reg.client_secret || "",
+        });
+        console.log(`[oauth] Dynamically registered client for ${service.name}: ${clientId}`);
+      } catch (err) {
+        console.error(`[oauth] Dynamic registration failed for ${service.name}:`, err);
+        res.status(400).json({
+          error: "Dynamic client registration failed. Please enter Client ID manually in Advanced settings.",
+          needs_config: true,
+        });
+        return;
+      }
+    } else {
+      res.status(400).json({
+        error: "No registration endpoint available. Please enter Client ID in Advanced settings.",
+        needs_config: true,
+      });
+      return;
+    }
+  }
+
+  // Reload service to get any updates
+  service = db.getService(service.id)!;
+
+  const redirectUrl = initiateOAuthConnect(
+    service.id, authorizeUrl, clientId,
+    service.oauth_scope, _gatewayUrl, usePkce
+  );
+  res.json({ redirect_url: redirectUrl });
 });
 
 // ── Users ───────────────────────────────────────────────────────────────────
