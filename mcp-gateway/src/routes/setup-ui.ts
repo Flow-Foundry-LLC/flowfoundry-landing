@@ -40,8 +40,9 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
   .badge-orange { background: rgba(232,135,42,0.15); color: var(--accent); }
   .badge-gray { background: rgba(154,151,143,0.15); color: var(--text2); }
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 0 20px; }
-  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
   th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
   th { color: var(--text2); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
   td { font-size: 0.95rem; }
   td:nth-child(2) { white-space: normal; word-break: break-all; max-width: 280px; }
@@ -56,7 +57,7 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .form-row.full { grid-template-columns: 1fr; }
   label { font-size: 0.85rem; color: var(--text2); margin-bottom: 4px; display: block; }
-  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
   .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle .slider { position: absolute; inset: 0; background: var(--bg2); border-radius: 24px; border: 1px solid var(--border); transition: 0.2s; }
