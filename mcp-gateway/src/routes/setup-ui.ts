@@ -14,6 +14,8 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MCP Gateway — Setup</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/favicon.png">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
   :root {
@@ -29,18 +31,20 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
   h2 { font-size: 1.3rem; margin: 32px 0 16px; color: var(--accent); }
   h3 { font-size: 1.1rem; margin: 16px 0 8px; }
   .subtitle { color: var(--text2); margin-bottom: 32px; }
-  .card { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .card { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; overflow: hidden; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .card-header h3 { margin: 0; }
   .badge { display: inline-block; padding: 2px 10px; border-radius: 100px; font-size: 0.75rem; font-weight: 600; }
   .badge-green { background: rgba(52,211,153,0.15); color: var(--green); }
   .badge-red { background: rgba(248,113,113,0.15); color: var(--red); }
   .badge-orange { background: rgba(232,135,42,0.15); color: var(--accent); }
   .badge-gray { background: rgba(154,151,143,0.15); color: var(--text2); }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 0 20px; }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { color: var(--text2); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
   td { font-size: 0.95rem; }
+  td:nth-child(2) { white-space: normal; word-break: break-all; max-width: 280px; }
   button, .btn { padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.85rem; transition: opacity 0.2s; }
   button:hover, .btn:hover { opacity: 0.85; }
   .btn-primary { background: linear-gradient(135deg, var(--accent2), var(--accent), var(--accent3)); color: #0a0a0b; }
@@ -52,7 +56,7 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .form-row.full { grid-template-columns: 1fr; }
   label { font-size: 0.85rem; color: var(--text2); margin-bottom: 4px; display: block; }
-  .actions { display: flex; gap: 8px; align-items: center; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle .slider { position: absolute; inset: 0; background: var(--bg2); border-radius: 24px; border: 1px solid var(--border); transition: 0.2s; }
@@ -71,10 +75,22 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
   .modal .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
   .user-email { font-size: 0.85rem; color: var(--text2); }
   #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 24px; background: var(--green); color: #0a0a0b; border-radius: 8px; font-weight: 600; display: none; z-index: 200; }
+  @media (max-width: 768px) {
+    .container { padding: 16px 12px; }
+    h1 { font-size: 1.4rem; }
+    .card { padding: 14px; }
+    .card-header { flex-direction: column; align-items: flex-start; }
+    .form-row { grid-template-columns: 1fr; }
+    .nav { gap: 16px; overflow-x: auto; }
+    .modal { padding: 20px; width: 95%; }
+    button, .btn { padding: 6px 14px; }
+    .user-email { word-break: break-all; }
+  }
 </style>
 </head>
 <body>
 <div class="container">
+  <div style="margin-bottom:8px"><img src="/logo.png" alt="FlowFoundry" style="width:220px;height:auto"></div>
   <h1>MCP Gateway</h1>
   <p class="subtitle">Manage clients, services, and access — <strong>${_req.user!.email}</strong> (${role})</p>
 
@@ -134,17 +150,35 @@ setupRouter.get("/", requireRole("super_admin", "admin"), (_req, res) => {
     <input type="hidden" id="service-edit-id">
     <input type="hidden" id="service-client-id">
     <div class="form-row">
-      <div><label>Service Name</label><input id="service-name" placeholder="ghost"></div>
-      <div><label>Backend URL</label><input id="service-url" placeholder="http://127.0.0.1:3100"></div>
-    </div>
-    <div class="form-row">
-      <div><label>API Key Env Var</label><input id="service-apikey" placeholder="GHOST_MCP_API_KEY"></div>
+      <div><label>Service Name</label><input id="service-name" placeholder="cloudflare" oninput="autoFillServiceFields()"></div>
       <div><label>Auth Type</label>
-        <select id="service-authtype">
+        <select id="service-authtype" onchange="toggleAuthFields()">
           <option value="api_key">API Key</option>
           <option value="oauth">OAuth</option>
           <option value="none">None</option>
         </select>
+      </div>
+    </div>
+    <div class="form-row" id="url-row">
+      <div><label id="url-label">Backend URL</label><input id="service-url" placeholder="http://127.0.0.1:3100"></div>
+      <div id="apikey-field"><label>API Key Env Var</label><input id="service-apikey" placeholder="GHOST_MCP_API_KEY"></div>
+    </div>
+    <div id="oauth-section" style="display:none">
+      <div style="cursor:pointer;padding:10px 0;color:var(--accent);font-weight:500;font-size:0.85rem;user-select:none" onclick="toggleOAuthAdvanced()">
+        ▶ Advanced
+      </div>
+      <div id="oauth-fields" style="display:none">
+        <div class="form-row">
+          <div><label>Client ID</label><input id="service-oauth-client-id" placeholder="your-client-id"></div>
+          <div><label>Client Secret</label><input id="service-oauth-client-secret" type="password" placeholder="your-client-secret"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Authorize URL</label><input id="service-oauth-authorize-url" placeholder="https://provider.com/oauth2/authorize"></div>
+          <div><label>Token URL</label><input id="service-oauth-token-url" placeholder="https://provider.com/oauth2/token"></div>
+        </div>
+        <div class="form-row full">
+          <div><label>Scope</label><input id="service-oauth-scope" placeholder="read write"></div>
+        </div>
       </div>
     </div>
     <div class="form-actions">
@@ -197,23 +231,34 @@ async function loadClients() {
   for (const c of clients) {
     const services = await api('/clients/' + c.project_id + '/services');
     html += '<div class="card"><div class="card-header"><div><h3>' + c.name + '</h3><span class="user-email">Prefix: ' + c.prefix + ' &middot; Project: ' + c.project_id + '</span></div><div class="actions">';
-    if (IS_SUPER) html += '<button class="btn btn-sm btn-ghost" onclick="showAddService(\\'' + c.project_id + '\\')">+ Add MCP</button>';
+    if (IS_SUPER) html += '<button class="btn btn-sm btn-ghost" onclick="showAddService(\\'' + c.project_id + '\\', \\'' + c.name.replace(/'/g, "\\\\'") + '\\')">+ Add MCP</button>';
     if (IS_SUPER) html += '<button class="btn btn-sm btn-danger" onclick="deleteClient(\\'' + c.project_id + '\\')">Delete</button>';
     html += '</div></div>';
 
     if (services.length) {
-      html += '<table><thead><tr><th>Service</th><th>URL</th><th>Auth</th><th>Status</th><th></th></tr></thead><tbody>';
+      html += '<div class="table-wrap"><table><thead><tr><th>Service</th><th>URL</th><th>Auth</th><th>Status</th><th></th></tr></thead><tbody>';
       for (const s of services) {
         html += '<tr><td><strong>' + s.name + '</strong></td><td style="color:var(--text2);font-size:0.85rem">' + s.url + '</td>';
-        html += '<td><span class="badge badge-gray">' + s.auth_type + '</span></td>';
+        html += '<td><span class="badge badge-gray">' + s.auth_type + '</span>';
+        if (s.auth_type === 'oauth') {
+          if (s.oauth_access_token) {
+            html += ' <span class="badge badge-green">Connected</span>';
+          } else {
+            html += ' <button class="btn btn-sm btn-ghost" style="margin-left:6px;padding:2px 10px;background:rgba(232,135,42,0.15);color:var(--accent);border:none" onclick="connectOAuth(' + s.id + ')">Connect</button>';
+          }
+        }
+        html += '</td>';
         html += '<td>' + (s.enabled ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Disabled</span>') + '</td>';
         html += '<td class="actions">';
         html += '<label class="toggle"><input type="checkbox" ' + (s.enabled ? 'checked' : '') + ' onchange="toggleService(' + s.id + ', this.checked)"><span class="slider"></span></label>';
-        html += ' <button class="btn btn-sm btn-ghost" onclick="editService(' + s.id + ',\\'' + s.client_project_id + '\\',\\'' + s.name + '\\',\\'' + s.url + '\\',\\'' + (s.api_key_env||'') + '\\',\\'' + s.auth_type + '\\')">Edit</button>';
+        html += ' <button class="btn btn-sm btn-ghost" onclick="editService(' + s.id + ',\\'' + s.client_project_id + '\\',\\'' + s.name + '\\',\\'' + s.url + '\\',\\'' + (s.api_key_env||'') + '\\',\\'' + s.auth_type + '\\',\\'' + (s.oauth_client_id||'') + '\\',\\'' + (s.oauth_authorize_url||'') + '\\',\\'' + (s.oauth_token_url||'') + '\\',\\'' + (s.oauth_scope||'') + '\\')">Edit</button>';
+        if (s.auth_type === 'oauth' && s.oauth_access_token) {
+          html += ' <button class="btn btn-sm btn-ghost" onclick="connectOAuth(' + s.id + ')">Reconnect</button>';
+        }
         if (IS_SUPER) html += ' <button class="btn btn-sm btn-danger" onclick="deleteService(' + s.id + ')">×</button>';
         html += '</td></tr>';
       }
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
     } else {
       html += '<div class="empty" style="padding:20px">No MCPs configured for this client yet.</div>';
     }
@@ -249,7 +294,112 @@ async function deleteClient(id) {
 }
 
 // ── Services ──
-function showAddService(clientId) {
+let _nextPort = 3100;
+async function fetchNextPort() {
+  try {
+    const res = await api('/services/next-port');
+    _nextPort = res.port;
+  } catch (e) { _nextPort = 3100; }
+}
+
+let _clientName = '';
+
+function autoFillServiceFields() {
+  const editId = document.getElementById('service-edit-id').value;
+  if (editId) return;
+  const authType = document.getElementById('service-authtype').value;
+  const name = document.getElementById('service-name').value.trim();
+  if (name && authType !== 'oauth') {
+    document.getElementById('service-url').value = 'http://127.0.0.1:' + _nextPort;
+    const prefix = _clientName ? _clientName.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_' : '';
+    document.getElementById('service-apikey').value = prefix + name.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_MCP_API_KEY';
+  } else if (!name) {
+    document.getElementById('service-url').value = '';
+    document.getElementById('service-apikey').value = '';
+  }
+  toggleAuthFields();
+}
+
+function toggleAuthFields() {
+  const authType = document.getElementById('service-authtype').value;
+  const apiKeyField = document.getElementById('apikey-field');
+  const oauthSection = document.getElementById('oauth-section');
+  const urlLabel = document.getElementById('url-label');
+  const urlInput = document.getElementById('service-url');
+  const urlRow = document.getElementById('url-row');
+  if (authType === 'api_key') {
+    apiKeyField.style.display = '';
+    oauthSection.style.display = 'none';
+    urlLabel.textContent = 'Backend URL';
+    urlInput.placeholder = 'http://127.0.0.1:3100';
+    urlRow.style.gridTemplateColumns = '1fr 1fr';
+  } else if (authType === 'oauth') {
+    apiKeyField.style.display = 'none';
+    oauthSection.style.display = 'block';
+    urlLabel.textContent = 'MCP Server URL';
+    urlInput.placeholder = 'https://mcp.cloudflare.com';
+    urlRow.style.gridTemplateColumns = '1fr';
+    if (!document.getElementById('service-edit-id').value) {
+      document.getElementById('service-apikey').value = '';
+      document.getElementById('service-url').value = '';
+    }
+  } else {
+    apiKeyField.style.display = 'none';
+    oauthSection.style.display = 'none';
+    urlLabel.textContent = 'Backend URL';
+    urlInput.placeholder = 'http://127.0.0.1:3100';
+    urlRow.style.gridTemplateColumns = '1fr';
+    if (!document.getElementById('service-edit-id').value) {
+      document.getElementById('service-apikey').value = '';
+    }
+  }
+}
+
+let _oauthAdvancedOpen = false;
+function toggleOAuthAdvanced() {
+  _oauthAdvancedOpen = !_oauthAdvancedOpen;
+  document.getElementById('oauth-fields').style.display = _oauthAdvancedOpen ? 'block' : 'none';
+  const toggle = document.querySelector('#oauth-section > div:first-child');
+  toggle.textContent = (_oauthAdvancedOpen ? '▼' : '▶') + ' Advanced OAuth Settings';
+}
+
+async function discoverOAuth() {
+  const url = document.getElementById('service-url').value.trim();
+  if (!url) { alert('Enter a Backend URL first'); return; }
+  try {
+    const result = await api('/oauth-discover', 'POST', { url });
+    if (result.discovered) {
+      document.getElementById('service-oauth-authorize-url').value = result.authorization_endpoint || '';
+      document.getElementById('service-oauth-token-url').value = result.token_endpoint || '';
+      if (result.scopes_supported && result.scopes_supported.length) {
+        document.getElementById('service-oauth-scope').value = result.scopes_supported.join(' ');
+      }
+      toast('Endpoints discovered!');
+    } else {
+      toast('Discovery failed — enter URLs manually');
+    }
+  } catch (e) { alert('Discovery error: ' + e.message); }
+}
+
+async function connectOAuth(serviceId) {
+  try {
+    const res = await api('/services/' + serviceId + '/oauth-connect');
+    window.location.href = res.redirect_url;
+  } catch (e) {
+    // If needs_config, reload clients to get updated discovered URLs and open edit
+    const msg = e.message || '';
+    if (msg.includes('Advanced settings') || msg.includes('Client ID')) {
+      toast(msg);
+      // Reload to pick up any auto-discovered URLs, then user can edit
+      loadClients();
+    } else {
+      alert('OAuth connect error: ' + msg);
+    }
+  }
+}
+
+async function showAddService(clientId, clientName) {
+  _clientName = clientName || '';
   document.getElementById('service-modal-title').textContent = 'Add MCP Service';
   document.getElementById('service-edit-id').value = '';
   document.getElementById('service-client-id').value = clientId;
@@ -257,10 +407,19 @@ function showAddService(clientId) {
   document.getElementById('service-url').value = '';
   document.getElementById('service-apikey').value = '';
   document.getElementById('service-authtype').value = 'api_key';
+  document.getElementById('service-oauth-client-id').value = '';
+  document.getElementById('service-oauth-client-secret').value = '';
+  document.getElementById('service-oauth-authorize-url').value = '';
+  document.getElementById('service-oauth-token-url').value = '';
+  document.getElementById('service-oauth-scope').value = '';
+  _oauthAdvancedOpen = false;
+  document.getElementById('oauth-fields').style.display = 'none';
+  toggleAuthFields();
+  await fetchNextPort();
   openModal('modal-service');
 }
 
-function editService(id, clientId, name, url, apiKey, authType) {
+function editService(id, clientId, name, url, apiKey, authType, oauthClientId, oauthAuthorizeUrl, oauthTokenUrl, oauthScope) {
   document.getElementById('service-modal-title').textContent = 'Edit MCP Service';
   document.getElementById('service-edit-id').value = id;
   document.getElementById('service-client-id').value = clientId;
@@ -268,17 +427,34 @@ function editService(id, clientId, name, url, apiKey, authType) {
   document.getElementById('service-url').value = url;
   document.getElementById('service-apikey').value = apiKey;
   document.getElementById('service-authtype').value = authType;
+  document.getElementById('service-oauth-client-id').value = oauthClientId || '';
+  document.getElementById('service-oauth-client-secret').value = '';
+  document.getElementById('service-oauth-authorize-url').value = oauthAuthorizeUrl || '';
+  document.getElementById('service-oauth-token-url').value = oauthTokenUrl || '';
+  document.getElementById('service-oauth-scope').value = oauthScope || '';
+  _oauthAdvancedOpen = authType === 'oauth';
+  document.getElementById('oauth-fields').style.display = _oauthAdvancedOpen ? 'block' : 'none';
+  toggleAuthFields();
   openModal('modal-service');
 }
 
 async function saveService() {
   const editId = document.getElementById('service-edit-id').value;
+  const authType = document.getElementById('service-authtype').value;
   const data = {
     name: document.getElementById('service-name').value,
     url: document.getElementById('service-url').value,
     api_key_env: document.getElementById('service-apikey').value,
-    auth_type: document.getElementById('service-authtype').value,
+    auth_type: authType,
   };
+  if (authType === 'oauth') {
+    data.oauth_client_id = document.getElementById('service-oauth-client-id').value;
+    const secret = document.getElementById('service-oauth-client-secret').value;
+    if (secret) data.oauth_client_secret = secret; // only send if changed
+    data.oauth_authorize_url = document.getElementById('service-oauth-authorize-url').value;
+    data.oauth_token_url = document.getElementById('service-oauth-token-url').value;
+    data.oauth_scope = document.getElementById('service-oauth-scope').value;
+  }
   try {
     if (editId) {
       await api('/services/' + editId, 'PUT', data);
@@ -305,7 +481,7 @@ async function deleteService(id) {
 async function loadUsers() {
   const users = await api('/users');
   const el = document.getElementById('users-list');
-  let html = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead><tbody>';
+  let html = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead><tbody>';
   for (const u of users) {
     const roleBadge = u.role === 'super_admin' ? 'badge-orange' : u.role === 'admin' ? 'badge-green' : 'badge-gray';
     html += '<tr><td><strong>' + u.name + '</strong></td><td style="color:var(--text2)">' + u.email + '</td>';
@@ -316,7 +492,7 @@ async function loadUsers() {
     html += '</select></td>';
     html += '<td><button class="btn btn-sm btn-danger" onclick="deleteUser(\\'' + u.zuid + '\\')">Remove</button></td></tr>';
   }
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   html += '<p style="color:var(--text3);margin-top:16px;font-size:0.85rem">New users are auto-added as "dev" when they first authenticate via Zoho SSO.</p>';
   el.innerHTML = html;
 }
@@ -356,7 +532,7 @@ async function loadUserAccess() {
     const services = await api('/clients/' + c.project_id + '/services');
     if (!services.length) continue;
 
-    html += '<div class="card"><h3>' + c.name + '</h3><table><thead><tr><th>Service</th><th>Default</th><th>Override</th></tr></thead><tbody>';
+    html += '<div class="card"><h3>' + c.name + '</h3><div class="table-wrap"><table><thead><tr><th>Service</th><th>Default</th><th>Override</th></tr></thead><tbody>';
     for (const s of services) {
       const hasOverride = overrideMap[s.id] !== undefined;
       const isEnabled = hasOverride ? overrideMap[s.id] === 1 : true;
@@ -368,7 +544,7 @@ async function loadUserAccess() {
       html += '<option value="0" ' + (hasOverride && !isEnabled ? 'selected' : '') + '>Force Disable</option>';
       html += '</select></td></tr>';
     }
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>';
   }
   el.innerHTML = html || '<div class="empty">No services configured yet.</div>';
 }
@@ -393,6 +569,18 @@ async function syncProjects() {
     }
     loadClients();
   } catch (e) { alert('Sync failed: ' + e.message); }
+}
+
+// Check for OAuth redirect result
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('oauth') === 'success') {
+  const svcName = urlParams.get('service') || '';
+  setTimeout(() => toast('OAuth connected' + (svcName ? ': ' + svcName : '')), 300);
+  history.replaceState(null, '', '/setup');
+} else if (urlParams.get('oauth') === 'error') {
+  const msg = urlParams.get('message') || 'Unknown error';
+  setTimeout(() => { const t = document.getElementById('toast'); t.textContent = 'OAuth error: ' + msg; t.style.display = 'block'; t.style.background = 'var(--red)'; setTimeout(() => { t.style.display = 'none'; t.style.background = 'var(--green)'; }, 4000); }, 300);
+  history.replaceState(null, '', '/setup');
 }
 
 // Initial load
