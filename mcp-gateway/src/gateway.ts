@@ -101,9 +101,17 @@ setupApp.post("/setup/saml/callback", authLimiter, express.urlencoded({ extended
     const samlUser = await validateSamlResponse(req.body);
     console.log(`[setup] SAML login: ${samlUser.email}`);
 
-    // Use email hash as user ID (SAML doesn't give us ZUID)
-    const userId = samlUser.email.replace(/[^a-zA-Z0-9]/g, "_");
-    upsertUser(userId, samlUser.email, samlUser.email.split("@")[0]);
+    // Look up existing user by email first, fall back to email-derived ID
+    const existingByEmail = (await import("./db.js")).default
+      .prepare("SELECT zuid FROM users WHERE email = ?")
+      .get(samlUser.email) as { zuid: string } | undefined;
+    const userId = existingByEmail?.zuid || samlUser.email.replace(/[^a-zA-Z0-9]/g, "_");
+
+    // Build display name from SAML attributes
+    const name = samlUser.displayName
+      || [samlUser.firstName, samlUser.lastName].filter(Boolean).join(" ")
+      || samlUser.email.split("@")[0];
+    upsertUser(userId, samlUser.email, name);
 
     // Sign a session JWT
     const { access_token } = await signGatewayToken(

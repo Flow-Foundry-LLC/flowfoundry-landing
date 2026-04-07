@@ -88,15 +88,12 @@ db.exec(`
 
 // ── Seed super admin ────────────────────────────────────────────────────────
 
-// Seed super admin (both ZUID and SAML email-based ID)
-for (const [id, email, name] of [
-  ["24042349", "brayden.b@flowfoundry.com", "Brayden Bengtzen"],
-  ["brayden_b_flowfoundry_com", "brayden.b@flowfoundry.com", "Brayden Bengtzen"],  // SAML login ID
-] as const) {
-  const existing = db.prepare("SELECT zuid FROM users WHERE zuid = ?").get(id);
+// Seed super admin (Zoho ZUID)
+{
+  const existing = db.prepare("SELECT zuid FROM users WHERE zuid = ?").get("24042349");
   if (!existing) {
     db.prepare("INSERT INTO users (zuid, email, name, role) VALUES (?, ?, ?, ?)").run(
-      id, email, name, "super_admin"
+      "24042349", "brayden.b@flowfoundry.com", "Brayden Bengtzen", "super_admin"
     );
   }
 }
@@ -128,10 +125,10 @@ export function upsertUser(zuid: string, email: string, name: string, role?: str
         .run(email, name, zuid);
     }
   } else if (existingByEmail && existingByEmail.zuid !== zuid) {
-    // Same email, different ID — update the existing record's ID to match
-    // This happens when SAML login creates a different ID than OAuth login
-    db.prepare("UPDATE users SET zuid = ?, name = ?, updated_at = datetime('now') WHERE email = ?")
-      .run(zuid, name, email);
+    // Same email, different ID — update the existing record's name but keep the original ZUID
+    db.prepare("UPDATE users SET name = ?, updated_at = datetime('now') WHERE email = ?")
+      .run(name, email);
+    return existingByEmail;
   } else {
     db.prepare("INSERT INTO users (zuid, email, name, role) VALUES (?, ?, ?, ?)")
       .run(zuid, email, name, role || "dev");

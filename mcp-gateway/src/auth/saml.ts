@@ -37,6 +37,9 @@ const saml = new SAML({
 export interface SAMLUser {
   email: string;
   nameID: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
   sessionIndex?: string;
 }
 
@@ -85,9 +88,21 @@ export async function validateResponse(body: { SAMLResponse: string }): Promise<
   const { profile } = await saml.validatePostResponseAsync(body);
   if (!profile) throw new Error("SAML validation failed: no profile");
 
+  // Log all profile attributes to discover what Zoho sends
+  console.log("[saml] Profile attributes:", JSON.stringify(profile, null, 2));
+
+  // Extract name from common SAML attribute names
+  const attrs = profile as Record<string, unknown>;
+  const firstName = (attrs["First Name"] || attrs["firstName"] || attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"] || attrs["givenname"] || "") as string;
+  const lastName = (attrs["Last Name"] || attrs["lastName"] || attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"] || attrs["surname"] || "") as string;
+  const displayName = (attrs["Display Name"] || attrs["displayName"] || attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || "") as string;
+
   return {
     email: profile.nameID || profile.email as string || "",
     nameID: profile.nameID || "",
+    firstName,
+    lastName,
+    displayName,
     sessionIndex: profile.sessionIndex,
   };
 }
