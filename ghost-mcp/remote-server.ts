@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "node:http";
-import { createHmac } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { readFile, realpath } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 import { z } from "zod";
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ function createGhostMcpServer(): McpServer {
 
   server.tool("ghost_list_posts", "List blog posts with filters", {
     status: z.enum(["published", "draft", "scheduled", "all"]).optional(),
-    tag: z.string().optional(),
+    tag: z.string().regex(/^[a-z0-9-]+$/, "Tag must be a valid slug (lowercase alphanumeric and hyphens)").optional(),
     limit: z.number().optional(),
     page: z.number().optional(),
   }, async ({ status, tag, limit, page }) => {
@@ -321,6 +321,18 @@ function createGhostMcpServer(): McpServer {
     file_path: z.string(),
     purpose: z.enum(["image", "profile_image", "icon"]).optional(),
   }, async ({ file_path, purpose }) => {
+    // Validate path to prevent traversal attacks
+    const ALLOWED_DIRS = ["/tmp", "/var/www", "/home"];
+    const realPath = await realpath(file_path).catch(() => file_path);
+    const resolved = resolve(realPath);
+    if (!ALLOWED_DIRS.some((dir) => resolved.startsWith(dir))) {
+      throw new Error("File path not allowed. Upload files must be in /tmp, /var/www, or /home.");
+    }
+    const ext = basename(resolved).split(".").pop()?.toLowerCase() || "";
+    const allowedExts = ["png", "jpg", "jpeg", "gif", "svg", "webp", "ico"];
+    if (!allowedExts.includes(ext)) {
+      throw new Error(`File type .${ext} not allowed. Supported: ${allowedExts.join(", ")}`);
+    }
     const data = await ghostUpload("/images/upload/", file_path, purpose || "image");
     const images = data.images as Array<{ url: string }>;
     return { content: [{ type: "text", text: JSON.stringify({ url: images[0].url, message: "Image uploaded." }, null, 2) }] };
@@ -332,8 +344,9 @@ function createGhostMcpServer(): McpServer {
 // ── HTTP Server ─────────────────────────────────────────────────────────────
 
 const httpServer = createServer(async (req, res) => {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS — only allow requests from the local gateway
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || "http://127.0.0.1:3000";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, MCP-Protocol-Version");
 
@@ -352,9 +365,12 @@ const httpServer = createServer(async (req, res) => {
 
   // MCP endpoint
   if (req.method === "POST" && req.url === "/mcp") {
-    // Validate API key
+    // Validate API key (timing-safe comparison)
     const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== `Bearer ${MCP_API_KEY}`) {
+    const expected = `Bearer ${MCP_API_KEY}`;
+    const isValid = authHeader && authHeader.length === expected.length &&
+      timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+    if (!isValid) {
       res.writeHead(401, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Unauthorized" }));
       return;

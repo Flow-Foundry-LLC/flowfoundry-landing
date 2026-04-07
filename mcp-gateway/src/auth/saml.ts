@@ -24,8 +24,8 @@ const saml = new SAML({
   issuer: SP_ENTITY_ID,
   callbackUrl: SP_ACS_URL,
   idpCert: CERT,
-  wantAssertionsSigned: false,
-  wantAuthnResponseSigned: false,
+  wantAssertionsSigned: true,
+  wantAuthnResponseSigned: true,
 });
 
 export interface SAMLUser {

@@ -33,8 +33,7 @@ export async function verifyGatewayToken(
   token: string,
   issuer: string
 ): Promise<GatewayTokenPayload> {
-  // Don't validate issuer strictly — just verify signature and expiry
-  const { payload } = await jwtVerify(token, getSecret());
+  const { payload } = await jwtVerify(token, getSecret(), { issuer });
 
   return {
     zuid: payload.sub!,
