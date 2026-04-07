@@ -1,3 +1,6 @@
 node_modules/
 .env
 dist/
+gateway.db
+gateway.db-shm
+gateway.db-wal

@@ -14,6 +14,7 @@ import {
 import { signGatewayToken, verifyGatewayToken } from "./jwt.js";
 import type { GatewayConfig } from "../config.js";
 import { TTLCache } from "../cache.js";
+import { setZohoToken } from "../db.js";
 
 interface PendingAuth {
   codeChallenge: string;
@@ -127,6 +128,12 @@ export class ZohoOAuthProvider implements OAuthServerProvider {
 
       // Cache projects
       this.projectCache.set(profile.zuid, configuredProjects, this.config.project_cache_ttl_ms);
+
+      // Persist refresh token for project syncing
+      if (zohoTokens.refresh_token) {
+        setZohoToken("zoho_refresh_token", zohoTokens.refresh_token);
+        console.log(`[auth] Stored Zoho refresh token for project syncing`);
+      }
 
       // Store completed auth data
       this.completedAuths.set(gatewayCode, {
