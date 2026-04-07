@@ -1,0 +1,15 @@
+{
+  "portal_name": "flowfoundry",
+  "gateway_url": "https://mcp.flowfoundry.com",
+  "project_cache_ttl_ms": 300000,
+  "jwt_expiry": "8h",
+  "clients": {
+    "2492385000000487005": {
+      "name": "Melody Lane Home Pros",
+      "prefix": "melodylane",
+      "services": [
+        { "name": "ghost", "url": "http://127.0.0.1:3100", "api_key_env": "GHOST_MCP_API_KEY" }
+      ]
+    }
+  }
+}
